@@ -1,0 +1,68 @@
+import time
+from openai import OpenAI
+import requests
+
+class LocalEngine:
+    def __init__(self, base_url="http://localhost:11434/api/chat", model="qwen:0.5b"):
+        self.base_url = base_url
+        self.model = model
+
+    def chat(self, prompt, max_tokens=200):
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+            "options": {"num_predict": max_tokens}
+        }
+        resp = requests.post(self.base_url, json=payload, timeout=15)
+        resp.raise_for_status()
+        return resp.json()["message"]["content"]
+
+class APIEngine:
+    def __init__(self, base_url, api_key, model="deepseek-chat"):
+        self.client = OpenAI(base_url=base_url, api_key=api_key)
+        self.model = model
+
+    def chat(self, prompt, max_tokens=200):
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role":"user","content":prompt}],
+            max_tokens=max_tokens
+        )
+        return resp.choices[0].message.content
+
+class LLM:
+    def __init__(self, local_engine:LocalEngine, api_engine:APIEngine):
+        self.local = local_engine
+        self.api = api_engine
+
+    def ask(self, prompt, prefer="local", max_tokens=200):
+        """
+        增强项：失败重试，最多2次重试，重试全部失败之后再切换备选引擎
+        选择理由：网络抖动、ollama偶尔端口瞬断属于瞬时故障，重试可以解决；
+                  最多2次避免无限卡死，重试耗尽再回退引擎，兼顾稳定性和资源开销。
+        """
+        max_retry = 2
+        if prefer == "local":
+            primary, backup = self.local, self.api
+        else:
+            primary, backup = self.api, self.local
+
+        for attempt in range(max_retry + 1):
+            try:
+                return primary.chat(prompt, max_tokens=max_tokens)
+            except Exception as e:
+                print(f"[首选引擎失败，重试 {attempt+1}/{max_retry}] err:{str(e)}")
+                time.sleep(0.3)
+        # 两次重试全部失败，切换备选引擎
+        print("[首选引擎重试耗尽，自动切换备用引擎]")
+        return backup.chat(prompt, max_tokens=max_tokens)
+
+
+if __name__ == "__main__":
+    # 本地ollama
+    le = LocalEngine()
+    # 填入你的deepseek key和url
+    ae = APIEngine(base_url="https://api.deepseek.com/v1", api_key="sk-xxx")
+    bot = LLM(le, ae)
+    print(bot.ask("简单介绍HSK4", prefer="local"))
