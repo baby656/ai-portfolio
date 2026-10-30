@@ -1,0 +1,27 @@
+# 互联网（Ollama本地模型）学习记录
+## 一、安装过程
+我在Windows系统下载并安装Ollama，选择本地模式使用，不登录云端账号。
+打开命令提示符CMD，执行命令拉取模型：
+`ollama pull qwen2.5:7b-instruct-q4_K_M`
+选用qwen2.5:7b-instruct-q4_K_M，适合本地电脑运行，占用内存相对小，兼顾中文对话能力。
+
+## 二、运行测试
+下载完成后执行：
+`ollama run qwen2.5:7b-instruct-q4_K_M`
+输入提问，模型可以实时给出回答，完成对话测试。
+新开窗口执行：
+`ollama list` 查看本机已经下载好的模型
+`ollama ps` 查看当前正在运行的模型、资源占用情况
+
+## 三、原理分析（被动语态，对应课堂要求）
+The model is stored locally on the computer.
+User requests are received by Ollama service.
+Tokens are generated one by one by the large language model.
+Answers are returned to the user after calculation.
+
+## 四、对比：本地模型 vs 在线互联网模型
+在线模型：Requests are sent through the Internet. Data is transmitted to remote servers.
+本地Ollama：All calculations are finished on this computer. No network is needed after the model is downloaded.
+
+## 五、感悟
+Local large models can be used without the Internet after downloading. Privacy is better protected. But more computer memory is required.
