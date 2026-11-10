@@ -1,0 +1,15 @@
+# assistant_v1.py
+def answer(question: str, use_rag: bool, prefer="api"):
+    try:
+        if use_rag:
+            res = f"【RAG模式-{prefer}】回答：这里后续接入RAG检索结果，问题：{question}"
+        else:
+            res = f"【纯LLM模式-{prefer}】回答：这里后续接入大模型直接回答，问题：{question}"
+        return res
+    except Exception as e:
+        return f"运行失败：{str(e)}"
+
+# 简单自测
+if __name__ == "__main__":
+    print(answer("什么是区别词", use_rag=True, prefer="api"))
+    print(answer("什么是区别词", use_rag=False, prefer="api"))
