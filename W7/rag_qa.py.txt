@@ -1,0 +1,60 @@
+from langchain_community.document_loaders import TextLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import OllamaEmbeddings
+from langchain_community.llms import Ollama
+from langchain.chains import RetrievalQA
+
+# ========== 1.加载文本 TextLoader ==========
+loader = TextLoader("knowledge.txt", encoding="utf-8")
+docs = loader.load()
+
+# ========== 2.分块 chunk_size=500 chunk_overlap=50 ==========
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500,
+    chunk_overlap=50
+)
+split_docs = splitter.split_documents(docs)
+
+# ==========3.向量化 nomic-embed-text + Chroma ==========
+embedding = OllamaEmbeddings(model="nomic-embed-text")
+vectordb = Chroma.from_documents(
+    documents=split_docs,
+    embedding=embedding,
+    persist_directory="./chroma_db"
+)
+retriever = vectordb.as_retriever(search_kwargs={"k":3})
+
+# ==========4.LLM，提示词约束：资料没有就如实说 ==========
+llm = Ollama(model="qwen2.5:0.5b")
+prompt_template = """
+请只根据提供的参考资料回答问题。资料中没有的内容就如实说“资料没有相关信息”，不要编造内容。
+参考资料：{context}
+问题：{question}
+"""
+
+qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    chain_type="stuff",
+    retriever=retriever,
+    return_source_documents=True
+)
+
+# 测试问题
+if __name__ == "__main__":
+    test_questions = [
+        "HSK4词汇一共有多少个？",
+        "HSK4满分多少，多少分及格？",
+        "HSK4国内一年考几次，分别在几月？",
+        "HSK4考文言文吗？",
+        "HSK4有哪些题型？"
+    ]
+    for q in test_questions:
+        print(f"\n【问题】{q}")
+        # 裸答
+        direct = llm.invoke(q)
+        print(f"【本地qwen2.5:0.5b裸答】{direct}")
+        # RAG回答
+        res = qa_chain.invoke(q)
+        print(f"【RAG回答】{res['result']}")
+        print(f"【引用原文片段】{res['source_documents'][0].page_content}")
